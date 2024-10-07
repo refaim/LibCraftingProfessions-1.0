@@ -12,19 +12,42 @@ end
 
 local LibCraftingProfessionAPI = --[[---@type LibCraftingProfessionAPI]] library
 
+---@type table<string, boolean>
+local ALL_KNOWN_CRAFTING_PROFESSIONS_SET = {
+    ["Alchemy"] = true,
+    ["Blacksmithing"] = true,
+    ["Cooking"] = true,
+    ["Enchanting"] = true,
+    ["Engineering"] = true,
+    ["First Aid"] = true,
+    ["Leatherworking"] = true,
+    ["Mining"] = true,
+    ["Poisons"] = true,
+    ["Tailoring"] = true,
+}
+---@type table<string, string>
+local ENGLISH_TO_LOCALIZED = {}
+---@type table<string, string>
+local LOCALIZED_TO_ENGLISH = {}
+
 local AceEvent, _ = LibStub("AceEvent-3.0", false)
 
 ---@shape LpProfession
----@field name string
+---@field english_name string
+---@field localized_name string
+
+---@shape LpKnownProfession
+---@field english_name string
+---@field localized_name string
 ---@field cur_rank number
 
----@shape LpSkill
+---@shape LpKnownSkill
 ---@field name string
 ---@field item_link string
 ---@field difficulty "trivial" | "easy" | "medium" | "optimal" | "difficult"
 ---@field num_available number
 
----@type table<string, LpSkill[]>
+---@type table<string, LpKnownSkill[]>
 local skills_by_profession = {}
 
 ---@return boolean
@@ -38,46 +61,40 @@ local function ready(value)
     return value ~= "" and value ~= 0
 end
 
----@return string[]
-function LibCraftingProfessionAPI:GetAllKnownProfessions()
-    return {
-        "Alchemy",
-        "Blacksmithing",
-        "Cooking",
-        "Enchanting",
-        "Engineering",
-        "First Aid",
-        "Leatherworking",
-        "Mining",
-        "Tailoring",
-    }
+---@return LpProfession[]
+function LibCraftingProfessionAPI:GetAllProfessions()
+    ---@type LpProfession[]
+    local professions = {}
+    for english_name, _ in pairs(ALL_KNOWN_CRAFTING_PROFESSIONS_SET) do
+        tinsert(professions, {english_name = english_name, localized_name = ENGLISH_TO_LOCALIZED[english_name]})
+    end
+    return professions
 end
 
----@return LpProfession[]|nil
+---@return LpKnownProfession[]|nil
 function LibCraftingProfessionAPI:GetProfessionsKnownByCharacter()
     local num_of_professions = GetNumSkillLines()
     if not ready(num_of_professions) then
         return nil
     end
 
-    ---@type table<string, true>
-    local set_of_known_professions = {}
-    for _, profession in ipairs(self:GetAllKnownProfessions()) do
-        set_of_known_professions[profession] = true
-    end
-
-    ---@type LpProfession[]
+    ---@type LpKnownProfession[]
     local professions = {}
     for i = 1, num_of_professions do
-        local name, is_header, _, rank, _, _, _, _, _, _, _, _, _ = GetSkillLineInfo(i)
+        local localized_name, is_header, _, rank, _, _, _, _, _, _, _, _, _ = GetSkillLineInfo(i)
         if not is_header then
-            if not ready(name) or not ready(rank) then
+            if not ready(localized_name) then
                 return nil
             end
-            if set_of_known_professions[name] ~= nil then
-                ---@type LpProfession
-                local profession = {name = name, cur_rank = rank}
-                tinsert(professions, profession)
+
+            local english_name = LOCALIZED_TO_ENGLISH[localized_name]
+            local is_crafting_profession = ALL_KNOWN_CRAFTING_PROFESSIONS_SET[english_name] ~= nil
+            if is_crafting_profession then
+                local has_rank = english_name ~= "Poisons"
+                if has_rank and not ready(rank) then
+                    return nil
+                end
+                tinsert(professions, {english_name = english_name, localized_name = localized_name, cur_rank = rank})
             end
         end
     end
@@ -86,8 +103,10 @@ function LibCraftingProfessionAPI:GetProfessionsKnownByCharacter()
 end
 
 ---@param profession string
----@return LpSkill[]|nil
-function LibCraftingProfessionAPI:GetSkillsKnownByCharacter(profession) return skills_by_profession[profession] end
+---@return LpKnownSkill[]|nil
+function LibCraftingProfessionAPI:GetSkillsKnownByCharacter(profession)
+    return skills_by_profession[profession] or skills_by_profession[LOCALIZED_TO_ENGLISH[profession]]
+end
 
 ---@shape _LpTradeSkillFilterOption
 ---@field name string
@@ -103,7 +122,7 @@ function LibCraftingProfessionAPI:GetSkillsKnownByCharacter(profession) return s
 ---@field DisableFilters fun():void
 
 ---@param adapter _LpProfessionAdapter
----@return LpSkill[]|nil
+---@return LpKnownSkill[]|nil
 local function scan_skills(adapter)
     local profession, cur_rank, max_rank = adapter.GetProfessionInfo()
     if not ready(profession) or not ready(cur_rank) or not ready(max_rank) then
@@ -135,7 +154,7 @@ local function scan_skills(adapter)
         return nil
     end
 
-    ---@type LpSkill[]
+    ---@type LpKnownSkill[]
     local skills = {}
     for i = 1, num_of_skills_after_expansion do
         local skill_name, skill_type_or_difficulty, num_available, _ = adapter.GetSkillInfo(i)
@@ -147,7 +166,7 @@ local function scan_skills(adapter)
             if num_available == nil or not ready(item_link) then
                 return nil
             end
-            ---@type LpSkill
+            ---@type LpKnownSkill
             local skill = {
                 name = --[[---@not nil]] skill_name,
                 item_link = --[[---@not nil]] item_link,
@@ -190,7 +209,7 @@ local function scan_craft_frame()
     }
 
     local profession, _, _ = adapter.GetProfessionInfo()
-    if not ready(profession) or profession == "Beast Training" then
+    if not ready(profession) or LOCALIZED_TO_ENGLISH[--[[---@not nil]] profession] == "Beast Training" then
         return
     end
 
@@ -271,6 +290,110 @@ local function scan_trade_skill_frame()
     end
 
     skills_by_profession[ --[[---@not nil]] profession] = skills
+end
+
+local L = ENGLISH_TO_LOCALIZED
+local game_locale = GetLocale()
+if game_locale == "enUS" or game_locale == "enGB" then
+    L["Alchemy"] = "Alchemy"
+    L["Beast Training"] = "Beast Training"
+    L["Blacksmithing"] = "Blacksmithing"
+    L["Cooking"] = "Cooking"
+    L["Enchanting"] = "Enchanting"
+    L["Engineering"] = "Engineering"
+    L["First Aid"] = "First Aid"
+    L["Leatherworking"] = "Leatherworking"
+    L["Mining"] = "Mining"
+    L["Poisons"] = "Poisons"
+    L["Tailoring"] = "Tailoring"
+elseif game_locale == "deDE" then
+    L["Alchemy"] = "Alchimie"
+    L["Beast Training"] = "Wildtierausbildung"
+    L["Blacksmithing"] = "Schmiedekunst"
+    L["Cooking"] = "Kochkunst"
+    L["Enchanting"] = "Verzauberkunst"
+    L["Engineering"] = "Ingenieurskunst"
+    L["First Aid"] = "Erste Hilfe"
+    L["Leatherworking"] = "Lederverarbeitung"
+    L["Mining"] = "Bergbau"
+    L["Poisons"] = "Gifte"
+    L["Tailoring"] = "Schneiderei"
+elseif game_locale == "esES" then
+    L["Alchemy"] = "Alquimia"
+    L["Beast Training"] = "Doma de bestias"
+    L["Blacksmithing"] = "Herrería"
+    L["Cooking"] = "Cocina"
+    L["Enchanting"] = "Encantamiento"
+    L["Engineering"] = "Ingeniería"
+    L["First Aid"] = "Primeros auxilios"
+    L["Leatherworking"] = "Peletería"
+    L["Mining"] = "Minería"
+    L["Poisons"] = "Venenos"
+    L["Tailoring"] = "Costura"
+elseif game_locale == "frFR" then
+    L["Alchemy"] = "Alchimie"
+    L["Beast Training"] = "Apprivoisement"
+    L["Blacksmithing"] = "Forge"
+    L["Cooking"] = "Cuisine"
+    L["Enchanting"] = "Enchantement"
+    L["Engineering"] = "Ingénierie"
+    L["First Aid"] = "Secourisme"
+    L["Leatherworking"] = "Travail du cuir"
+    L["Mining"] = "Minage"
+    L["Poisons"] = "Poisons"
+    L["Tailoring"] = "Couture"
+elseif game_locale == "koKR" then
+    L["Alchemy"] = "연금술"
+    L["Beast Training"] = "야수 조련"
+    L["Blacksmithing"] = "대장기술"
+    L["Cooking"] = "요리"
+    L["Enchanting"] = "마법부여"
+    L["Engineering"] = "기계공학"
+    L["First Aid"] = "응급치료"
+    L["Leatherworking"] = "가죽 세공"
+    L["Mining"] = "채광"
+    L["Poisons"] = "독"
+    L["Tailoring"] = "재봉술"
+elseif game_locale == "ruRU" then
+    L["Alchemy"] = "Алхимия"
+    L["Beast Training"] = "Дрессировка"
+    L["Blacksmithing"] = "Кузнечное дело"
+    L["Cooking"] = "Кулинария"
+    L["Enchanting"] = "Наложение чар"
+    L["Engineering"] = "Инженерное дело"
+    L["First Aid"] = "Первая помощь"
+    L["Leatherworking"] = "Кожевничество"
+    L["Mining"] = "Горное дело"
+    L["Poisons"] = "Яды"
+    L["Tailoring"] = "Портняжное дело"
+elseif game_locale == "zhCN" then
+    L["Alchemy"] = "炼金术"
+    L["Beast Training"] = "训练野兽"
+    L["Blacksmithing"] = "锻造"
+    L["Cooking"] = "烹饪"
+    L["Enchanting"] = "附魔"
+    L["Engineering"] = "工程学"
+    L["First Aid"] = "急救"
+    L["Leatherworking"] = "制皮"
+    L["Mining"] = "采矿"
+    L["Poisons"] = "毒药"
+    L["Tailoring"] = "裁缝"
+elseif game_locale == "zhTW" then
+    L["Alchemy"] = "煉金術"
+    L["Beast Training"] = "訓練野獸"
+    L["Blacksmithing"] = "鍛造"
+    L["Cooking"] = "烹飪"
+    L["Enchanting"] = "附魔"
+    L["Engineering"] = "工程學"
+    L["First Aid"] = "急救"
+    L["Leatherworking"] = "製皮"
+    L["Mining"] = "採礦"
+    L["Poisons"] = "毒藥"
+    L["Tailoring"] = "裁縫"
+end
+
+for english_name, localized_name in pairs(ENGLISH_TO_LOCALIZED) do
+    LOCALIZED_TO_ENGLISH[localized_name] = english_name
 end
 
 local incoming_events = AceEvent:Embed({})
