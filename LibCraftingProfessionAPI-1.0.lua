@@ -41,13 +41,13 @@ local LOCALIZED_TO_ENGLISH = {}
 ---@alias LcpSkillDifficulty "trivial" | "easy" | "medium" | "optimal" | "difficult"
 
 ---@shape LcpKnownSkill
----@field name string
+---@field localized_name string
 ---@field item_link string
 ---@field difficulty LcpSkillDifficulty
 ---@field num_available number
 
 ---@type table<string, LcpKnownSkill[]>
-local skills_by_profession = {}
+local skills_by_english_profession_name = {}
 
 ---@return boolean
 local function ready(value)
@@ -101,10 +101,10 @@ function LibCraftingProfessionAPI:GetProfessionsKnownByCharacter()
     return professions
 end
 
----@param profession string
+---@param profession_name string
 ---@return LcpKnownSkill[]|nil
-function LibCraftingProfessionAPI:GetSkillsKnownByCharacter(profession)
-    return skills_by_profession[profession] or skills_by_profession[LOCALIZED_TO_ENGLISH[profession]]
+function LibCraftingProfessionAPI:GetSkillsKnownByCharacter(profession_name)
+    return skills_by_english_profession_name[profession_name] or skills_by_english_profession_name[LOCALIZED_TO_ENGLISH[profession_name]]
 end
 
 ---@shape _LcpTradeSkillFilterOption
@@ -205,17 +205,22 @@ local function scan_craft_frame()
         DisableFilters = function() end,
     }
 
-    local profession, _, _ = adapter.GetProfessionInfo()
-    if not ready(profession) or LOCALIZED_TO_ENGLISH[--[[---@not nil]] profession] == "Beast Training" then
+    local localized_name, _, _ = adapter.GetProfessionInfo()
+    if not ready(localized_name) then
+        return
+    end
+
+    local english_name = LOCALIZED_TO_ENGLISH[--[[---@not nil]] localized_name]
+    if english_name == nil or english_name == "Beast Training" then
         return
     end
 
     local skills = scan_skills(adapter)
-    if not ready(profession) or not ready(skills) then
+    if not ready(skills) then
         return
     end
 
-    skills_by_profession[ --[[---@not nil]] profession] = skills
+    skills_by_english_profession_name[english_name] = skills
 end
 
 ---@shape _LcpSkillFilterAdapter
@@ -276,8 +281,13 @@ local function scan_trade_skill_frame()
         end,
     }
 
-    local profession, _, _ = profession_adapter.GetProfessionInfo()
-    if not ready(profession) then
+    local localized_name, _, _ = profession_adapter.GetProfessionInfo()
+    if not ready(localized_name) then
+        return
+    end
+
+    local english_name = LOCALIZED_TO_ENGLISH[--[[---@not nil]] localized_name]
+    if english_name == nil then
         return
     end
 
@@ -286,7 +296,7 @@ local function scan_trade_skill_frame()
         return
     end
 
-    skills_by_profession[ --[[---@not nil]] profession] = skills
+    skills_by_english_profession_name[english_name] = skills
 end
 
 local L = ENGLISH_TO_LOCALIZED
