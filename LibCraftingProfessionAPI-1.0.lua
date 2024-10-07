@@ -32,22 +32,22 @@ local LOCALIZED_TO_ENGLISH = {}
 
 local AceEvent, _ = LibStub("AceEvent-3.0", false)
 
----@shape LpProfession
+---@shape LcpProfession
 ---@field english_name string
 ---@field localized_name string
 
----@shape LpKnownProfession
+---@shape LcpKnownProfession
 ---@field english_name string
 ---@field localized_name string
 ---@field cur_rank number
 
----@shape LpKnownSkill
+---@shape LcpKnownSkill
 ---@field name string
 ---@field item_link string
 ---@field difficulty "trivial" | "easy" | "medium" | "optimal" | "difficult"
 ---@field num_available number
 
----@type table<string, LpKnownSkill[]>
+---@type table<string, LcpKnownSkill[]>
 local skills_by_profession = {}
 
 ---@return boolean
@@ -61,9 +61,9 @@ local function ready(value)
     return value ~= "" and value ~= 0
 end
 
----@return LpProfession[]
+---@return LcpProfession[]
 function LibCraftingProfessionAPI:GetAllProfessions()
-    ---@type LpProfession[]
+    ---@type LcpProfession[]
     local professions = {}
     for english_name, _ in pairs(ALL_KNOWN_CRAFTING_PROFESSIONS_SET) do
         tinsert(professions, {english_name = english_name, localized_name = ENGLISH_TO_LOCALIZED[english_name]})
@@ -71,14 +71,14 @@ function LibCraftingProfessionAPI:GetAllProfessions()
     return professions
 end
 
----@return LpKnownProfession[]|nil
+---@return LcpKnownProfession[]|nil
 function LibCraftingProfessionAPI:GetProfessionsKnownByCharacter()
     local num_of_professions = GetNumSkillLines()
     if not ready(num_of_professions) then
         return nil
     end
 
-    ---@type LpKnownProfession[]
+    ---@type LcpKnownProfession[]
     local professions = {}
     for i = 1, num_of_professions do
         local localized_name, is_header, _, rank, _, _, _, _, _, _, _, _, _ = GetSkillLineInfo(i)
@@ -103,16 +103,16 @@ function LibCraftingProfessionAPI:GetProfessionsKnownByCharacter()
 end
 
 ---@param profession string
----@return LpKnownSkill[]|nil
+---@return LcpKnownSkill[]|nil
 function LibCraftingProfessionAPI:GetSkillsKnownByCharacter(profession)
     return skills_by_profession[profession] or skills_by_profession[LOCALIZED_TO_ENGLISH[profession]]
 end
 
----@shape _LpTradeSkillFilterOption
+---@shape _LcpTradeSkillFilterOption
 ---@field name string
 ---@field type "inv_slot" | "subclass"
 
----@shape _LpProfessionAdapter
+---@shape _LcpProfessionAdapter
 ---@field GetProfessionInfo fun():string|nil, number|nil, number|nil
 ---@field GetNumSkills fun():number|nil
 ---@field GetSkillInfo fun(index:number):string|nil, string|nil, number|nil, wowboolean
@@ -121,8 +121,8 @@ end
 ---@field CollapseHeader fun(index:number):void
 ---@field DisableFilters fun():void
 
----@param adapter _LpProfessionAdapter
----@return LpKnownSkill[]|nil
+---@param adapter _LcpProfessionAdapter
+---@return LcpKnownSkill[]|nil
 local function scan_skills(adapter)
     local profession, cur_rank, max_rank = adapter.GetProfessionInfo()
     if not ready(profession) or not ready(cur_rank) or not ready(max_rank) then
@@ -154,7 +154,7 @@ local function scan_skills(adapter)
         return nil
     end
 
-    ---@type LpKnownSkill[]
+    ---@type LcpKnownSkill[]
     local skills = {}
     for i = 1, num_of_skills_after_expansion do
         local skill_name, skill_type_or_difficulty, num_available, _ = adapter.GetSkillInfo(i)
@@ -166,7 +166,7 @@ local function scan_skills(adapter)
             if num_available == nil or not ready(item_link) then
                 return nil
             end
-            ---@type LpKnownSkill
+            ---@type LcpKnownSkill
             local skill = {
                 name = --[[---@not nil]] skill_name,
                 item_link = --[[---@not nil]] item_link,
@@ -188,7 +188,7 @@ local function scan_skills(adapter)
 end
 
 local function scan_craft_frame()
-    ---@type _LpProfessionAdapter
+    ---@type _LcpProfessionAdapter
     local adapter = {
         GetProfessionInfo = function()
             local name, cur_rank, max_rank = GetCraftDisplaySkillLine()
@@ -221,20 +221,20 @@ local function scan_craft_frame()
     skills_by_profession[ --[[---@not nil]] profession] = skills
 end
 
----@shape _LpSkillFilterAdapter
+---@shape _LcpSkillFilterAdapter
 ---@field GetType fun(): "inv_slot" | "subclass"
 ---@field GetOptions fun(): string...
 ---@field GetOptionState fun(index:number): wowboolean
 ---@field SetOptionState fun(index:number, enable:wowboolean, exclusive:wowboolean): void
 
----@param adapter _LpSkillFilterAdapter
----@return _LpTradeSkillFilterOption[]
+---@param adapter _LcpSkillFilterAdapter
+---@return _LcpTradeSkillFilterOption[]
 local function disable_trade_skill_filters(adapter)
     if adapter.GetOptionState(0) == 1 then
         return {}
     end
 
-    ---@type _LpTradeSkillFilterOption[]
+    ---@type _LcpTradeSkillFilterOption[]
     local selected_options = {}
     for i, option in ipairs({adapter.GetOptions()}) do
         if adapter.GetOptionState(i) == 1 then
@@ -248,7 +248,7 @@ local function disable_trade_skill_filters(adapter)
 end
 
 local function scan_trade_skill_frame()
-    ---@type _LpSkillFilterAdapter
+    ---@type _LcpSkillFilterAdapter
     local inv_slot_filter_adapter = {
         GetType = function() return "inv_slot" end,
         GetOptions = GetTradeSkillInvSlots,
@@ -256,7 +256,7 @@ local function scan_trade_skill_frame()
         SetOptionState = SetTradeSkillInvSlotFilter,
     }
 
-    ---@type _LpSkillFilterAdapter
+    ---@type _LcpSkillFilterAdapter
     local subclass_filter_adapter = {
         GetType = function() return "subclass" end,
         GetOptions = GetTradeSkillSubClasses,
@@ -264,7 +264,7 @@ local function scan_trade_skill_frame()
         SetOptionState = SetTradeSkillSubClassFilter,
     }
 
-    ---@type _LpProfessionAdapter
+    ---@type _LcpProfessionAdapter
     local profession_adapter = {
         GetProfessionInfo = GetTradeSkillLine,
         GetNumSkills = GetNumTradeSkills,
