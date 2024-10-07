@@ -2,8 +2,7 @@
 local LibStub = getglobal("LibStub")
 assert(LibStub ~= nil)
 
-local MAJOR, MINOR = "LibCraftingProfessionAPI-1.0", 1
-local library, _ = LibStub:NewLibrary(MAJOR, MINOR)
+local library, _ = LibStub:NewLibrary("LibCraftingProfessionAPI-1.0", 1)
 if not library then
     return
 end
@@ -41,10 +40,12 @@ local AceEvent, _ = LibStub("AceEvent-3.0", false)
 ---@field localized_name string
 ---@field cur_rank number
 
+---@alias LcpSkillDifficulty "trivial" | "easy" | "medium" | "optimal" | "difficult"
+
 ---@shape LcpKnownSkill
 ---@field name string
 ---@field item_link string
----@field difficulty "trivial" | "easy" | "medium" | "optimal" | "difficult"
+---@field difficulty LcpSkillDifficulty
 ---@field num_available number
 
 ---@type table<string, LcpKnownSkill[]>
@@ -166,14 +167,12 @@ local function scan_skills(adapter)
             if num_available == nil or not ready(item_link) then
                 return nil
             end
-            ---@type LcpKnownSkill
-            local skill = {
+            tinsert(skills, {
                 name = --[[---@not nil]] skill_name,
                 item_link = --[[---@not nil]] item_link,
-                difficulty = --[[---@type "trivial" | "easy" | "medium" | "optimal" | "difficult"]] skill_type_or_difficulty,
+                difficulty = --[[---@type LcpSkillDifficulty]] skill_type_or_difficulty,
                 num_available = --[[---@not nil]] num_available,
-            }
-            tinsert(skills, skill)
+            })
         end
     end
 
