@@ -29,8 +29,6 @@ local ENGLISH_TO_LOCALIZED = {}
 ---@type table<string, string>
 local LOCALIZED_TO_ENGLISH = {}
 
-local AceEvent, _ = LibStub("AceEvent-3.0", false)
-
 ---@shape LcpProfession
 ---@field english_name string
 ---@field localized_name string
@@ -395,6 +393,13 @@ for english_name, localized_name in pairs(ENGLISH_TO_LOCALIZED) do
     LOCALIZED_TO_ENGLISH[localized_name] = english_name
 end
 
-local incoming_events = AceEvent:Embed({})
-incoming_events:RegisterEvent("CRAFT_SHOW", scan_craft_frame)
-incoming_events:RegisterEvent("TRADE_SKILL_SHOW", scan_trade_skill_frame)
+local event_frame = CreateFrame("Frame")
+event_frame:SetScript("OnEvent", function()
+    if event == "CRAFT_SHOW" then
+        scan_craft_frame()
+    elseif event == "TRADE_SKILL_SHOW" then
+        scan_trade_skill_frame()
+    end
+end)
+event_frame:RegisterEvent("CRAFT_SHOW")
+event_frame:RegisterEvent("TRADE_SKILL_SHOW")
