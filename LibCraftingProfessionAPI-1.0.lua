@@ -24,6 +24,7 @@ local ALL_KNOWN_CRAFTING_PROFESSIONS_SET = {
     ["Poisons"] = true,
     ["Tailoring"] = true,
 }
+
 ---@type table<string, string>
 local ENGLISH_TO_LOCALIZED = {}
 ---@type table<string, string>
@@ -36,7 +37,7 @@ local LOCALIZED_TO_ENGLISH = {}
 ---@shape LcpKnownProfession
 ---@field english_name string
 ---@field localized_name string
----@field cur_rank number
+---@field cur_rank number|nil
 
 ---@alias LcpSkillDifficulty "trivial" | "easy" | "medium" | "optimal" | "difficult"
 
@@ -46,8 +47,12 @@ local LOCALIZED_TO_ENGLISH = {}
 ---@field difficulty LcpSkillDifficulty
 ---@field num_available number
 
+---@alias LcpScanSkillsHandler fun(profession: LcpKnownProfession, skills: LcpKnownSkill[]):void
+
 ---@type table<string, LcpKnownSkill[]>
 local skills_by_english_profession_name = {}
+---@type table<string, LcpScanSkillsHandler[]>
+local skill_scan_handlers = {}
 
 ---@return boolean
 local function ready(value)
@@ -61,7 +66,7 @@ local function ready(value)
 end
 
 ---@return LcpProfession[]
-function LibCraftingProfessionAPI:GetAllProfessions()
+function LibCraftingProfessionAPI:GetAllExistingProfessions()
     ---@type LcpProfession[]
     local professions = {}
     for english_name, _ in pairs(ALL_KNOWN_CRAFTING_PROFESSIONS_SET) do
@@ -105,6 +110,15 @@ end
 ---@return LcpKnownSkill[]|nil
 function LibCraftingProfessionAPI:GetSkillsKnownByCharacter(profession_name)
     return skills_by_english_profession_name[profession_name] or skills_by_english_profession_name[LOCALIZED_TO_ENGLISH[profession_name]]
+end
+
+---@param event "LCP_SKILLS_UPDATE"
+---@param handler fun(profession: LcpKnownProfession, skills: LcpKnownSkill[]):void
+function LibCraftingProfessionAPI:RegisterEvent(event, handler)
+    if skill_scan_handlers[event] == nil then
+        skill_scan_handlers[event] = {}
+    end
+    tinsert(skill_scan_handlers[event], handler)
 end
 
 ---@shape _LcpTradeSkillFilterOption
@@ -165,12 +179,15 @@ local function scan_skills(adapter)
             if num_available == nil or not ready(item_link) then
                 return nil
             end
-            tinsert(skills, {
-                name = --[[---@not nil]] skill_name,
+
+            ---@type LcpKnownSkill
+            local skill = {
+                localized_name = --[[---@not nil]] skill_name,
                 item_link = --[[---@not nil]] item_link,
                 difficulty = --[[---@type LcpSkillDifficulty]] skill_type_or_difficulty,
                 num_available = --[[---@not nil]] num_available,
-            })
+            }
+            tinsert(skills, skill)
         end
     end
 
@@ -182,6 +199,27 @@ local function scan_skills(adapter)
     end
 
     return skills
+end
+
+---@param english_name string
+---@param skills LcpKnownSkill[]
+local function save_skills(english_name, skills)
+    skills_by_english_profession_name[english_name] = skills
+
+    local profession
+    for _, candidate in ipairs(LibCraftingProfessionAPI:GetProfessionsKnownByCharacter() or {}) do
+        if candidate.english_name == english_name then
+            profession = candidate
+            break
+        end
+    end
+    if profession == nil then
+        return
+    end
+
+    for _, handler in ipairs(skill_scan_handlers["LCP_SKILLS_UPDATE"] or {}) do
+        handler(profession, skills)
+    end
 end
 
 local function scan_craft_frame()
@@ -220,7 +258,7 @@ local function scan_craft_frame()
         return
     end
 
-    skills_by_english_profession_name[english_name] = skills
+    save_skills(english_name, --[[---@not nil]] skills)
 end
 
 ---@shape _LcpSkillFilterAdapter
@@ -296,9 +334,10 @@ local function scan_trade_skill_frame()
         return
     end
 
-    skills_by_english_profession_name[english_name] = skills
+    save_skills(english_name, --[[---@not nil]] skills)
 end
 
+-- TODO create Babble-Profession-3.0 library
 local L = ENGLISH_TO_LOCALIZED
 local game_locale = GetLocale()
 if game_locale == "enUS" or game_locale == "enGB" then
