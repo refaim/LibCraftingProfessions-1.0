@@ -2,17 +2,17 @@
 local LibStub = getglobal("LibStub")
 assert(LibStub ~= nil)
 
-local library, _ = LibStub:NewLibrary("LibCraftingProfessionAPI-1.0", 1)
+local library, _ = LibStub:NewLibrary("LibCraftingProfessions-1.0", 1)
 if not library then
     return
 end
 
----@class LibCraftingProfessionAPI
+---@class LibCraftingProfessions
 
-local LibCraftingProfessionAPI = --[[---@type LibCraftingProfessionAPI]] library
+local LibCraftingProfessions = --[[---@type LibCraftingProfessions]] library
 
 ---@type table<string, boolean>
-local ALL_KNOWN_CRAFTING_PROFESSIONS_SET = {
+local ALL_EXISTING_CRAFTING_PROFESSIONS_SET = {
     ["Alchemy"] = true,
     ["Blacksmithing"] = true,
     ["Cooking"] = true,
@@ -34,9 +34,7 @@ local LOCALIZED_TO_ENGLISH = {}
 ---@field english_name string
 ---@field localized_name string
 
----@shape LcpKnownProfession
----@field english_name string
----@field localized_name string
+---@shape LcpKnownProfession: LcpProfession
 ---@field cur_rank number|nil
 
 ---@alias LcpSkillDifficulty "trivial" | "easy" | "medium" | "optimal" | "difficult"
@@ -65,18 +63,26 @@ local function ready(value)
     return value ~= "" and value ~= 0
 end
 
+---
+--- Retrieves a list of all existing crafting professions in the game.
+---
 ---@return LcpProfession[]
-function LibCraftingProfessionAPI:GetAllExistingProfessions()
+function LibCraftingProfessions:GetAllExistingProfessions()
     ---@type LcpProfession[]
     local professions = {}
-    for english_name, _ in pairs(ALL_KNOWN_CRAFTING_PROFESSIONS_SET) do
+    for english_name, _ in pairs(ALL_EXISTING_CRAFTING_PROFESSIONS_SET) do
         tinsert(professions, {english_name = english_name, localized_name = ENGLISH_TO_LOCALIZED[english_name]})
     end
     return professions
 end
 
+---
+--- Retrieves a list of the player's known crafting professions.
+--- Returns a table of known professions, or nil if game data is not yet available.
+--- Use RegisterEvent("LCP_SKILLS_UPDATE", ...) to ensure data availability.
+---
 ---@return LcpKnownProfession[]|nil
-function LibCraftingProfessionAPI:GetProfessionsKnownByCharacter()
+function LibCraftingProfessions:GetPlayerProfessions()
     local num_of_professions = GetNumSkillLines()
     if not ready(num_of_professions) then
         return nil
@@ -92,7 +98,7 @@ function LibCraftingProfessionAPI:GetProfessionsKnownByCharacter()
             end
 
             local english_name = LOCALIZED_TO_ENGLISH[localized_name]
-            local is_crafting_profession = ALL_KNOWN_CRAFTING_PROFESSIONS_SET[english_name] ~= nil
+            local is_crafting_profession = ALL_EXISTING_CRAFTING_PROFESSIONS_SET[english_name] ~= nil
             if is_crafting_profession then
                 local has_rank = english_name ~= "Poisons"
                 if has_rank and not ready(rank) then
@@ -106,15 +112,23 @@ function LibCraftingProfessionAPI:GetProfessionsKnownByCharacter()
     return professions
 end
 
----@param profession_name string
----@return LcpKnownSkill[]|nil
-function LibCraftingProfessionAPI:GetSkillsKnownByCharacter(profession_name)
+---
+--- Retrieves a list of the player's skills for a specific profession.
+--- Returns a table of known skills for the specified profession, or nil if game data is not yet available
+--- Use RegisterEvent("LCP_SKILLS_UPDATE", ...) to ensure data availability.
+---
+--- @param profession_name string
+--- @return LcpKnownSkill[]|nil
+function LibCraftingProfessions:GetPlayerProfessionSkills(profession_name)
     return skills_by_english_profession_name[profession_name] or skills_by_english_profession_name[LOCALIZED_TO_ENGLISH[profession_name]]
 end
 
----@param event "LCP_SKILLS_UPDATE"
----@param handler fun(profession: LcpKnownProfession, skills: LcpKnownSkill[]):void
-function LibCraftingProfessionAPI:RegisterEvent(event, handler)
+---
+--- Registers a handler for the specific library event.
+---
+---@param event "LCP_SKILLS_UPDATE" @ The event to register for. This event is fired when skill data is updated and ready.
+---@param handler fun(profession: LcpKnownProfession, skills: LcpKnownSkill[]):void @ The function to call when the event is triggered.
+function LibCraftingProfessions:RegisterEvent(event, handler)
     if skill_scan_handlers[event] == nil then
         skill_scan_handlers[event] = {}
     end
@@ -201,13 +215,35 @@ local function scan_skills(adapter)
     return skills
 end
 
+---@param known_professions LcpKnownProfession[]|nil
+local function forget_obsolete_professions(known_professions)
+    if known_professions == nil then
+        return
+    end
+
+    ---@type table<string, boolean>
+    local known_profession_names_set = {}
+    for _, profession in ipairs(--[[---@not nil]] known_professions) do
+        known_profession_names_set[profession.english_name] = true
+    end
+
+    for english_name, _ in pairs(skills_by_english_profession_name) do
+        if known_profession_names_set[english_name] == nil then
+            skills_by_english_profession_name[english_name] = nil
+        end
+    end
+end
+
 ---@param english_name string
 ---@param skills LcpKnownSkill[]
 local function save_skills(english_name, skills)
     skills_by_english_profession_name[english_name] = skills
 
+    local known_professions = LibCraftingProfessions:GetPlayerProfessions()
+    forget_obsolete_professions(known_professions)
+
     local profession
-    for _, candidate in ipairs(LibCraftingProfessionAPI:GetProfessionsKnownByCharacter() or {}) do
+    for _, candidate in ipairs(known_professions or {}) do
         if candidate.english_name == english_name then
             profession = candidate
             break
@@ -337,7 +373,6 @@ local function scan_trade_skill_frame()
     save_skills(english_name, --[[---@not nil]] skills)
 end
 
--- TODO create Babble-Profession-3.0 library
 local L = ENGLISH_TO_LOCALIZED
 local game_locale = GetLocale()
 if game_locale == "enUS" or game_locale == "enGB" then
