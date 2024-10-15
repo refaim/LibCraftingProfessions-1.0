@@ -3,7 +3,7 @@
     Developed by: Refaim (rkharito@yandex.ru, https://github.com/refaim/)
     Website: https://github.com/refaim/LibCraftingProfessions-1.0
     Description: A library designed to provide a universal interface for crafting professions.
-    Dependencies: None
+    Dependencies: LibStub
     Compatibility: World of Warcraft Vanilla (1.12.1)
 ]]
 
