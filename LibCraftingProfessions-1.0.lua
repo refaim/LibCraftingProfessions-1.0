@@ -1,3 +1,12 @@
+--[[
+    Name: LibCraftingProfessions-1.0
+    Developed by: Refaim (rkharito@yandex.ru, https://github.com/refaim/)
+    Website: https://github.com/refaim/LibCraftingProfessions-1.0
+    Description: A library designed to provide a universal interface for crafting professions.
+    Dependencies: None
+    Compatibility: World of Warcraft Vanilla (1.12.1)
+]]
+
 ---@type LibStubDef
 local LibStub = getglobal("LibStub")
 assert(LibStub ~= nil)
@@ -64,10 +73,10 @@ local function ready(value)
 end
 
 ---
---- Retrieves a list of all existing crafting professions in the game.
+--- Retrieves a list of all supported crafting professions in the game.
 ---
 ---@return LcpProfession[]
-function LibCraftingProfessions:GetAllExistingProfessions()
+function LibCraftingProfessions:GetSupportedProfessions()
     ---@type LcpProfession[]
     local professions = {}
     for english_name, _ in pairs(ALL_EXISTING_CRAFTING_PROFESSIONS_SET) do
