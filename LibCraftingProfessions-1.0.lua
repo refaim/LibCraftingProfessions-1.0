@@ -4,7 +4,7 @@
     Website: https://github.com/refaim/LibCraftingProfessions-1.0
     Description: A library designed to provide a universal interface for crafting professions.
     Dependencies: LibStub
-    Compatibility: World of Warcraft Vanilla (1.12.1)
+    Compatibility: World of Warcraft Vanilla (1.12.1), Turtle (1.17.2)
 ]]
 
 ---@type LibStubDef
