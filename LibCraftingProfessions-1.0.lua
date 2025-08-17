@@ -11,7 +11,7 @@
 local LibStub = getglobal("LibStub")
 assert(LibStub ~= nil)
 
-local untyped_lib, _ = LibStub:NewLibrary("LibCraftingProfessions-1.0", 17)
+local untyped_lib, _ = LibStub:NewLibrary("LibCraftingProfessions-1.0", 18)
 if not untyped_lib then
     return
 end
@@ -43,6 +43,7 @@ P["Mining"] = {icon = [[Interface\Icons\spell_fire_flameblades]]}
 P["Poisons"] = {icon = [[Interface\Icons\trade_brewpoison]]}
 P["Tailoring"] = {icon = [[Interface\Icons\trade_tailoring]]}
 if IS_TURTLE_WOW then
+    P["Disguise"] = {icon = [[Interface\Icons\ability_rogue_disguise]]}
     P["Jewelcrafting"] = {icon = [[Interface\Icons\inv_helmet_44]]}
 end
 local PROFESSION_TO_PROPS = P
@@ -131,6 +132,25 @@ function lib:GetPlayerProfessions()
     local num_of_professions = GetNumSkillLines()
     if not ready(num_of_professions) then
         return nil
+    end
+
+    local _, player_class = UnitClass("player")
+    if IS_TURTLE_WOW and player_class == "ROGUE" then
+        for tab_index = 1, GetNumSpellTabs() do
+            local tab_name, _, offset, num_spells = GetSpellTabInfo(tab_index)
+            if not ready(tab_name) or not ready(num_spells) then
+                return nil
+            end
+            DEFAULT_CHAT_FRAME:AddMessage(tostring(tab_name)) -- TODO ZALEPA
+            for spell_index = offset + 1, offset + num_spells do
+                DEFAULT_CHAT_FRAME:AddMessage(tostring(spell_index)) -- TODO ZALEPA
+                local spell_name, _ GetSpellName(spell_index, BOOKTYPE_SPELL) -- TODO why returns nil :(
+                DEFAULT_CHAT_FRAME:AddMessage(tostring(spell_name)) -- TODO ZALEPA
+                --if not ready(spell_name) then
+                --    return nil
+                --end
+            end
+        end
     end
 
     ---@type LcpKnownProfession[]
@@ -342,6 +362,7 @@ local function is_third_party_loaded(addon)
     return IsAddOnLoaded(addon.name) == 1 and getglobal(addon.frame_name) ~= nil
 end
 
+-- TODO handle disguise (what addons support it?)
 ---@return LcpProfessionFrame
 local function detect_profession_frame(professionFrame)
     ---@type Frame
@@ -403,14 +424,24 @@ end
 local craft_adapter = {
     GetProfessionInfo = function()
         local name, cur_rank, max_rank = GetCraftDisplaySkillLine()
-        if name == nil then -- GetCraftDisplaySkillLine() returns nil for the "Beast Training" frame
+        if name == nil then -- GetCraftDisplaySkillLine() returns nil for the "Beast Training" and "Disguise" professions
             name = GetCraftName()
         end
-        return name, LOCALIZED_TO_ENGLISH[--[[---@type string]] name], cur_rank, max_rank
+
+        local english_name = LOCALIZED_TO_ENGLISH[--[[---@type string]] name]
+        if IS_TURTLE_WOW and english_name == "Disguise" then
+            cur_rank = 1
+            max_rank = 1
+        end
+
+        return name, english_name, cur_rank, max_rank
     end,
     GetNumSkills = GetNumCrafts,
     GetSkillInfo = function(i)
         local name, _, type, num_available, is_expanded = GetCraftInfo(i)
+        if type == "none" then
+            type = "easy"
+        end
         return name, type, num_available, is_expanded
     end,
     GetSkillItemLink = GetCraftItemLink,
@@ -590,6 +621,7 @@ if game_locale == "enUS" or game_locale == "enGB" then
     L["Poisons"] = "Poisons"
     L["Tailoring"] = "Tailoring"
     if IS_TURTLE_WOW then
+        L["Disguise"] = "Disguise"
         L["Jewelcrafting"] = "Jewelcrafting"
     end
 elseif game_locale == "deDE" then
@@ -604,6 +636,7 @@ elseif game_locale == "deDE" then
     L["Poisons"] = "Gifte"
     L["Tailoring"] = "Schneiderei"
     if IS_TURTLE_WOW then
+        L["Disguise"] = "Verkleiden"
         L["Jewelcrafting"] = "Juwelenschleifen"
     end
 elseif game_locale == "esES" then
@@ -611,6 +644,7 @@ elseif game_locale == "esES" then
         L["Alchemy"] = "Alquimia"
         L["Blacksmithing"] = "Ferraria"
         L["Cooking"] = "Culinária"
+        L["Disguise"] = "Disfarce"
         L["Enchanting"] = "Encantamento"
         L["Engineering"] = "Engenharia"
         L["First Aid"] = "Primeiro socorro"
@@ -643,6 +677,7 @@ elseif game_locale == "esMX" then
     L["Poisons"] = "Venenos"
     L["Tailoring"] = "Sastrería"
     if IS_TURTLE_WOW then
+        L["Disguise"] = "Disfraz"
         L["Jewelcrafting"] = "Joyería"
     end
 elseif game_locale == "frFR" then
@@ -657,6 +692,7 @@ elseif game_locale == "frFR" then
     L["Poisons"] = "Poisons"
     L["Tailoring"] = "Couture"
     if IS_TURTLE_WOW then
+        L["Disguise"] = "Déguisement"
         L["Jewelcrafting"] = "Joaillerie"
     end
 elseif game_locale == "koKR" then
@@ -671,6 +707,7 @@ elseif game_locale == "koKR" then
     L["Poisons"] = "독 조제"
     L["Tailoring"] = "재봉술"
     if IS_TURTLE_WOW then
+        L["Disguise"] = "변장술"
         L["Jewelcrafting"] = "보석세공"
     end
 elseif game_locale == "ptBR" then
@@ -685,6 +722,7 @@ elseif game_locale == "ptBR" then
     L["Poisons"] = "Venenos"
     L["Tailoring"] = "Alfaiataria"
     if IS_TURTLE_WOW then
+        L["Disguise"] = "Disfarce"
         L["First Aid"] = "Primeiro socorro"
         L["Jewelcrafting"] = "Joalheria"
         L["Leatherworking"] = "Couro"
@@ -701,6 +739,7 @@ elseif game_locale == "ruRU" then
     L["Poisons"] = "Яды"
     L["Tailoring"] = "Портняжное дело"
     if IS_TURTLE_WOW then
+        L["Disguise"] = "Маскировка"
         L["Jewelcrafting"] = "Ювелирное дело"
     end
 elseif game_locale == "zhCN" then
@@ -708,6 +747,7 @@ elseif game_locale == "zhCN" then
         L["Alchemy"] = "炼金术"
         L["Blacksmithing"] = "锻造"
         L["Cooking"] = "烹饪"
+        L["Disguise"] = "伪装术"
         L["Enchanting"] = "附魔"
         L["Engineering"] = "工程学"
         L["First Aid"] = "急救"
@@ -740,6 +780,7 @@ elseif game_locale == "zhTW" then
     L["Poisons"] = "毒藥"
     L["Tailoring"] = "裁縫"
     if IS_TURTLE_WOW then
+        L["Disguise"] = "偽裝術"
         L["Jewelcrafting"] = "珠寶設計"
     end
 end
